@@ -1,0 +1,1 @@
+#openssl s_client -proxy proxy.example.com:8080 -showcerts -connect api.telegram.org:443

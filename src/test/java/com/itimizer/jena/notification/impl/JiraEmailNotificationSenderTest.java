@@ -1,0 +1,174 @@
+package com.itimizer.jena.notification.impl;
+
+import com.itimizer.jena.dto.NotificationMessageDto;
+import io.netty.channel.ChannelOption;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
+import okhttp3.mockwebserver.SocketPolicy;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
+
+import java.io.IOException;
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("JiraEmailSender Tests")
+class JiraEmailNotificationSenderTest {
+
+    private JiraEmailNotificationSender jiraEmailSender;
+    private MockWebServer mockWebServer;
+
+    @BeforeEach
+    void setUp() throws IOException {
+        mockWebServer = new MockWebServer();
+        mockWebServer.start();
+
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 100)
+                .responseTimeout(Duration.ofMillis(100));
+
+        WebClient webClient = WebClient.builder()
+                .baseUrl(mockWebServer.url("/").toString())
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .build();
+
+        jiraEmailSender = new JiraEmailNotificationSender(webClient);
+    }
+
+    @AfterEach
+    void tearDown() throws IOException {
+        mockWebServer.shutdown();
+    }
+
+    @Test
+    @DisplayName("should send notification successfully")
+    void should_send_notification_successfully() throws InterruptedException {
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(204)
+                .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE));
+
+        NotificationMessageDto payload =
+                new NotificationMessageDto("PROJ-123", null, "Test message");
+
+        ResponseEntity<String> response = jiraEmailSender.send(payload);
+        assertThat(response).isNotNull();
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        RecordedRequest recordedRequest = mockWebServer.takeRequest(1, TimeUnit.SECONDS);
+        assertThat(recordedRequest).isNotNull();
+        assertThat(recordedRequest.getMethod()).isEqualTo("POST");
+        assertThat(recordedRequest.getPath()).isEqualTo("/rest/api/2/issue/PROJ-123/notify");
+        assertThat(recordedRequest.getBody().readUtf8()).isEqualTo("Test message");
+    }
+
+    @Test
+    @DisplayName("should throw exception when message is null")
+    @SuppressWarnings("ConstantConditions")
+    void should_throw_exception_when_message_is_null() {
+        assertThatThrownBy(() -> jiraEmailSender.send(null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("should handle Bad Request error")
+    void should_handle_bad_request_error() {
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(400)
+                .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .setBody("\"errorMessages\":[\"Unrecognized token\"]"));
+
+        NotificationMessageDto payload =
+                new NotificationMessageDto("PROJ-123", null, "Test message");
+
+        ResponseEntity<String> response = jiraEmailSender.send(payload);
+        assertThat(response).isNotNull();
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).contains("Error calling Jira Email API");
+    }
+
+    @Test
+    @DisplayName("should handle Unauthorized error")
+    void should_handle_unauthorized_error() {
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(401)
+                .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .setBody("<p>You are not authorized to access this page.</p>"));
+
+        NotificationMessageDto payload =
+                new NotificationMessageDto("PROJ-123", null, "Test message");
+
+        ResponseEntity<String> response = jiraEmailSender.send(payload);
+        assertThat(response).isNotNull();
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).contains("Error calling Jira Email API");
+    }
+
+    @Test
+    @DisplayName("should handle Internal Server Error")
+    void should_handle_internal_server_error() {
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(500)
+                .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .setBody("{\"error_code\":500,\"description\":\"Internal Server Error\"}"));
+
+        NotificationMessageDto payload =
+                new NotificationMessageDto("PROJ-123", null, "Test message");
+
+        ResponseEntity<String> response = jiraEmailSender.send(payload);
+        assertThat(response).isNotNull();
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).contains("Error calling Jira Email API");
+    }
+
+    @Test
+    @DisplayName("should handle network timeout")
+    void should_handle_network_timeout() {
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(204)
+                .setHeadersDelay(1, TimeUnit.SECONDS));
+
+        NotificationMessageDto payload =
+                new NotificationMessageDto("PROJ-123", null, "Test message");
+
+        ResponseEntity<String> response = jiraEmailSender.send(payload);
+        assertThat(response).isNotNull();
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.GATEWAY_TIMEOUT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).contains("Request timeout");
+    }
+
+    @Test
+    @DisplayName("should handle network connection error")
+    void should_handle_network_connection_error() {
+        mockWebServer.enqueue(new MockResponse()
+                .setSocketPolicy(SocketPolicy.DISCONNECT_AT_START));
+
+        NotificationMessageDto payload =
+                new NotificationMessageDto("PROJ-123", null, "Test message");
+
+        ResponseEntity<String> response = jiraEmailSender.send(payload);
+        assertThat(response).isNotNull();
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).contains("Failed to send");
+    }
+}

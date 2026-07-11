@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<status>
+  <status-code>500</status-code>
+  <message>not a json</message>
+</status>

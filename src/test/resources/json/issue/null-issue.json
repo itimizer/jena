@@ -1,0 +1,17 @@
+{
+  "id": "10000",
+  "self": "http://localhost:8090/jira/rest/api/latest/issue/10010",
+  "key": "TST-1",
+  "fields": {
+    "summary": "Test Issue Summary"
+  },
+  "names": {
+    "summary": "Summary"
+  },
+  "changelog": {
+    "startAt": 0,
+    "maxResults": 0,
+    "total": 0,
+    "histories": []
+  }
+}

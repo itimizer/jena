@@ -1,0 +1,654 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260701-1
+      author: kyakovlev
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: users
+      changes:
+        - createTable:
+            tableName: users
+            columns:
+              - column:
+                  name: username
+                  type: VARCHAR(50)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: password
+                  type: VARCHAR(68)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+  - changeSet:
+      id: 20260701-2
+      author: kyakovlev
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: authorities
+      changes:
+        - createTable:
+            tableName: authorities
+            columns:
+              - column:
+                  name: username
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_authorities_users
+                    references: users(username)
+              - column:
+                  name: authority
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+  - changeSet:
+      id: 20260701-3
+      author: kyakovlev
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: jira_filters
+      changes:
+        - createSequence:
+            sequenceName: jira_filter_sequence
+            startValue: 1
+            incrementBy: 1
+            dataType: bigint
+        - createTable:
+            tableName: jira_filters
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_jira_filters_name
+              - column:
+                  name: jql
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: mode
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: template_id
+                  type: BIGINT
+              - column:
+                  name: schedule_cron
+                  type: VARCHAR(255)
+              - column:
+                  name: schedule_zone
+                  type: VARCHAR(64)
+              - column:
+                  name: created_by
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_modified_by
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: >
+              ALTER TABLE jira_filters ADD CONSTRAINT ck_jira_filters_template_by_mode
+              CHECK ( (mode = 'INCREMENTAL' AND template_id IS NULL AND schedule_cron IS NULL)
+                   OR (mode = 'SNAPSHOT'    AND template_id IS NOT NULL) )
+  - changeSet:
+      id: 20260701-4
+      author: kyakovlev
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: notification_targets
+      changes:
+        - createSequence:
+            sequenceName: notification_target_sequence
+            startValue: 1
+            incrementBy: 1
+            dataType: bigint
+        - createTable:
+            tableName: notification_targets
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: channel
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: chat_id
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_modified_by
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: notification_targets
+            columnNames: channel, chat_id
+            constraintName: uq_notification_targets_channel_chat
+  - changeSet:
+      id: 20260701-5
+      author: kyakovlev
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: jira_search_run
+      changes:
+        - createSequence:
+            sequenceName: jira_search_run_sequence
+            startValue: 1
+            incrementBy: 1
+            dataType: bigint
+        - createTable:
+            tableName: jira_search_run
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: filter_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_jira_search_run_filter
+                    foreignKeyName: fk_jsr_filter
+                    references: jira_filters(id)
+              - column:
+                  name: base_url
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_run_time
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_success_run_time
+                  type: TIMESTAMP
+              - column:
+                  name: status
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: failure_count
+                  type: INT
+                  constraints:
+                    nullable: false
+  - changeSet:
+      id: 20260701-6
+      author: kyakovlev
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: templates
+      changes:
+        - createSequence:
+            sequenceName: template_sequence
+            startValue: 1
+            incrementBy: 1
+            dataType: bigint
+        - createTable:
+            tableName: templates
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content
+                  type: JSONB
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_modified_by
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+  - changeSet:
+      id: 20260701-7
+      author: kyakovlev
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: rules
+      changes:
+        - createSequence:
+            sequenceName: rule_sequence
+            startValue: 1
+            incrementBy: 1
+            dataType: bigint
+        - createTable:
+            tableName: rules
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: template_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_rules_templates
+                    references: templates(id)
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: event
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: field
+                  type: VARCHAR(255)
+              - column:
+                  name: from
+                  type: VARCHAR(255)
+              - column:
+                  name: from_string
+                  type: VARCHAR(255)
+              - column:
+                  name: to
+                  type: VARCHAR(255)
+              - column:
+                  name: to_string
+                  type: VARCHAR(255)
+              - column:
+                  name: has_changed
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_modified_by
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+  - changeSet:
+      id: 20260701-8
+      author: kyakovlev
+      changes:
+        - createIndex:
+            tableName: rules
+            indexName: idx_rules_field
+            columns:
+              - column:
+                  name: field
+  - changeSet:
+      id: 20260701-9
+      author: kyakovlev
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: changelog
+      changes:
+        - createSequence:
+            sequenceName: changelog_sequence
+            startValue: 1
+            incrementBy: 1
+            dataType: bigint
+        - createTable:
+            tableName: changelog
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: event
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: item
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: item_index
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: key
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: rule_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_changelog_rules
+                    references: rules(id)
+              - column:
+                  name: filter_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_changelog_filter
+                    references: jira_filters(id)
+              - column:
+                  name: context
+                  type: JSONB
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(16)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: changelog
+            columnNames: event, item, item_index, key, rule_id, filter_id
+            constraintName: uq_changelog_event_item_item_index_key_rule_id_filter_id
+  - changeSet:
+      id: 20260701-10
+      author: kyakovlev
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: notification
+      changes:
+        - createSequence:
+            sequenceName: notification_sequence
+            startValue: 1
+            incrementBy: 1
+            dataType: bigint
+        - createTable:
+            tableName: notification
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: changelog_id
+                  type: BIGINT
+                  constraints:
+                    nullable: true
+                    foreignKeyName: fk_notification_changelog
+                    references: changelog(id)
+              - column:
+                  name: issue_key
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: channel
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: target
+                  type: JSONB
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: failure_count
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+  - changeSet:
+      id: 20260701-11
+      author: kyakovlev
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: rule_filters
+      changes:
+        - createTable:
+            tableName: rule_filters
+            columns:
+              - column:
+                  name: rule_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: filter_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: rule_filters
+            columnNames: rule_id, filter_id
+            constraintName: pk_rule_filters
+        - addForeignKeyConstraint:
+            baseTableName: rule_filters
+            baseColumnNames: rule_id
+            referencedTableName: rules
+            referencedColumnNames: id
+            constraintName: fk_rf_rule
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: rule_filters
+            baseColumnNames: filter_id
+            referencedTableName: jira_filters
+            referencedColumnNames: id
+            constraintName: fk_rf_filter
+            onDelete: CASCADE
+  - changeSet:
+      id: 20260701-12
+      author: kyakovlev
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: filter_targets
+      changes:
+        - createTable:
+            tableName: filter_targets
+            columns:
+              - column:
+                  name: filter_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: target_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: filter_targets
+            columnNames: filter_id, target_id
+            constraintName: pk_filter_targets
+        - addForeignKeyConstraint:
+            baseTableName: filter_targets
+            baseColumnNames: filter_id
+            referencedTableName: jira_filters
+            referencedColumnNames: id
+            constraintName: fk_ft_filter
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: filter_targets
+            baseColumnNames: target_id
+            referencedTableName: notification_targets
+            referencedColumnNames: id
+            constraintName: fk_ft_target
+            onDelete: CASCADE
+  - changeSet:
+      id: 20260701-13
+      author: kyakovlev
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            foreignKeyConstraintExists:
+              foreignKeyName: fk_jira_filters_template
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: jira_filters
+            baseColumnNames: template_id
+            referencedTableName: templates
+            referencedColumnNames: id
+            constraintName: fk_jira_filters_template
+            onDelete: SET NULL

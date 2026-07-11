@@ -1,0 +1,36 @@
+{
+  "self":"http://localhost:8090/jira/rest/api/latest/user?username=admin",
+  "key": "admin",
+  "name":"admin",
+  "emailAddress":"admin@example.com",
+  "avatarUrls": {
+    "48x48": "http://localhost:8090/secure/useravatar?avatarId=10346",
+    "24x24": "http://localhost:8090/secure/useravatar?size=small&avatarId=10346",
+    "16x16": "http://localhost:8090/secure/useravatar?size=xsmall&avatarId=10346",
+    "32x32": "http://localhost:8090/secure/useravatar?size=medium&avatarId=10346"
+  },
+  "displayName":"Administrator",
+  "active": true,
+  "deleted": false,
+  "timeZone": "Antarctica/Troll",
+  "locale": "en_UK",
+  "groups":{
+    "size":3,
+    "items":[
+      {
+        "name":"jira-administrators"
+      },
+      {
+        "name":"jira-developers"
+      },
+      {
+        "name":"jira-users"
+      }
+    ]
+  },
+  "applicationRoles": {
+    "size": 2,
+    "items": []
+  },
+  "expand": "groups,applicationRoles"
+}

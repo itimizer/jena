@@ -1,0 +1,292 @@
+{
+  "expand": "names,schema,changelog",
+  "id": "10000",
+  "self": "http://localhost:8090/jira/rest/api/latest/issue/10010",
+  "key": "TST-1",
+  "fields": {
+    "summary": "Test Issue Summary",
+    "issuetype": {
+      "self": "http://localhost:8090/jira/rest/api/2/issuetype/1",
+      "id": "1",
+      "description": "A problem which impairs or prevents the functions of the product.",
+      "iconUrl": "http://localhost:8090/jira/images/icons/bug.gif",
+      "name": "Bug",
+      "subtask": false
+    },
+    "resolution": {
+      "self": "http://localhost:8090/jira/rest/api/2/resolution/10000",
+      "id": "10000",
+      "description": "Issue is done.",
+      "name": "Done"
+    },
+    "fixVersions": [
+      {
+        "self": "http://localhost:8090/jira/rest/api/2/version/10000",
+        "id": "10000",
+        "description": "Some version",
+        "name": "1.1",
+        "releaseDate": "2030-01-01",
+        "archived": false,
+        "released": false
+      }
+    ],
+    "resolutiondate": "2026-12-31T23:59:59.999+0200",
+    "timespent": 8700,
+    "creator": {
+      "self": "http://localhost:8090/jira/rest/api/2/user?username=admin",
+      "name": "admin",
+      "key": "admin",
+      "emailAddress": "admin@example.com",
+      "avatarUrls": {
+        "16x16": "http://localhost:8090/jira/secure/useravatar?size=small&ownerId=admin&avatarId=10054",
+        "48x48": "http://localhost:8090/jira/secure/useravatar?ownerId=admin&avatarId=10054"
+      },
+      "displayName": "Administrator",
+      "active": true,
+      "timeZone": "Antarctica/Troll"
+    },
+    "reporter": {
+      "self": "http://localhost:8090/jira/rest/api/2/user?username=admin",
+      "name": "admin",
+      "key": "admin",
+      "emailAddress": "admin@example.com",
+      "avatarUrls": {
+        "16x16": "http://localhost:8090/jira/secure/useravatar?size=small&ownerId=admin&avatarId=10054",
+        "48x48": "http://localhost:8090/jira/secure/useravatar?ownerId=admin&avatarId=10054"
+      },
+      "displayName": "Administrator",
+      "active": true,
+      "timeZone": "Antarctica/Troll"
+    },
+    "created": "2026-01-01T00:00:00.000+0200",
+    "updated": "2026-02-01T00:00:00.000+0200",
+    "description": "Test Issue Description",
+    "priority": {
+      "self": "http://localhost:8090/jira/rest/api/2/priority/3",
+      "iconUrl": "http://localhost:8090/jira/images/icons/priority_major.gif",
+      "name": "Major",
+      "id": "3"
+    },
+    "duedate": "2026-12-31",
+    "customfield_10000": 1.457,
+    "customfield_10001": {
+      "self": "http://localhost:8090/jira/rest/api/2/customFieldOption/10001",
+      "value": "Another",
+      "id": "10001"
+    },
+    "customfield_10002": null,
+    "status": {
+      "self": "http://localhost:8090/jira/rest/api/2/status/3",
+      "description": "This issue is being actively worked on at the moment by the assignee.",
+      "iconUrl": "http://localhost:8090/jira/images/icons/status_inprogress.gif",
+      "name": "In Progress",
+      "id": "3"
+    },
+    "labels": [
+      "bug",
+      "critical"
+    ],
+    "assignee": {
+      "self": "http://localhost:8090/jira/rest/api/2/user?username=admin",
+      "name": "admin",
+      "key": "admin",
+      "emailAddress": "admin@example.com",
+      "avatarUrls": {
+        "16x16": "http://localhost:8090/jira/secure/useravatar?size=small&avatarId=10082",
+        "48x48": "http://localhost:8090/jira/secure/useravatar?avatarId=10082"
+      },
+      "displayName": "Administrator",
+      "active": true,
+      "timeZone": "Antarctica/Troll"
+    },
+    "project": {
+      "self": "http://localhost:8090/jira/rest/api/2/project/TST",
+      "id": "10000",
+      "key": "TST",
+      "name": "Test Project",
+      "avatarUrls": {
+        "16x16": "http://localhost:8090/jira/secure/projectavatar?size=small&pid=10000&avatarId=10050",
+        "48x48": "http://localhost:8090/jira/secure/projectavatar?pid=10000&avatarId=10050"
+      }
+    },
+    "timeestimate": 21600,
+    "versions": [
+      {
+        "self": "http://localhost:8090/jira/rest/api/2/version/10001",
+        "id": "10001",
+        "description": "initial version",
+        "name": "1",
+        "archived": false,
+        "released": false
+      },
+      {
+        "self": "http://localhost:8090/jira/rest/api/2/version/10000",
+        "id": "10000",
+        "description": "Some version",
+        "name": "1.1",
+        "releaseDate": "2030-01-01",
+        "archived": false,
+        "released": false
+      }
+    ],
+    "components": [
+      {
+        "self": "http://localhost:8090/jira/rest/api/2/component/10000",
+        "id": "10000",
+        "name": "Component A",
+        "description": "this is some description of component A"
+      },
+      {
+        "self": "http://localhost:8090/jira/rest/api/2/component/10001",
+        "id": "10001",
+        "name": "Component B",
+        "description": "another description"
+      }
+    ],
+    "timeoriginalestimate": 25200,
+    "customfield_10011": null,
+    "aggregatetimespent": 8700
+  },
+  "names": {
+    "summary": "Summary",
+    "progress": "Progress",
+    "timetracking": "Time Tracking",
+    "issuetype": "Issue Type",
+    "resolution": "Resolution",
+    "fixVersions": "Fix Version/s",
+    "resolutiondate": "Resolved",
+    "timespent": "Time Spent",
+    "reporter": "Reporter",
+    "created": "Created",
+    "updated": "Updated",
+    "description": "Description",
+    "priority": "Priority",
+    "duedate": "Due Date",
+    "customfield_10000": "My Number Field",
+    "customfield_10001": "My Radio buttons",
+    "customfield_10002": "My Text Field",
+    "status": "Status",
+    "labels": "Labels",
+    "assignee": "Assignee",
+    "project": "Project",
+    "versions": "Affects Version/s",
+    "timeestimate": "Remaining Estimate",
+    "components": "Component/s",
+    "timeoriginalestimate": "Original Estimate"
+  },
+  "schema": {
+    "summary": {
+      "type": "string",
+      "system": "summary"
+    },
+    "progress": {
+      "type": "progress",
+      "system": "progress"
+    },
+    "timetracking": {
+      "type": "timetracking",
+      "system": "timetracking"
+    },
+    "issuetype": {
+      "type": "issuetype",
+      "system": "issuetype"
+    },
+    "resolution": {
+      "type": "resolution",
+      "system": "resolution"
+    },
+    "fixVersions": {
+      "type": "array",
+      "items": "version",
+      "system": "fixVersions"
+    },
+    "resolutiondate": {
+      "type": "datetime",
+      "system": "resolutiondate"
+    },
+    "timespent": {
+      "type": "number",
+      "system": "timespent"
+    },
+    "reporter": {
+      "type": "user",
+      "system": "reporter"
+    },
+    "created": {
+      "type": "datetime",
+      "system": "created"
+    },
+    "updated": {
+      "type": "datetime",
+      "system": "updated"
+    },
+    "description": {
+      "type": "string",
+      "system": "description"
+    },
+    "priority": {
+      "type": "priority",
+      "system": "priority"
+    },
+    "duedate": {
+      "type": "date",
+      "system": "duedate"
+    },
+    "customfield_10000": {
+      "type": "number",
+      "custom": "com.atlassian.jira.plugin.system.customfieldtypes:float",
+      "customId": 10000
+    },
+    "customfield_10001": {
+      "type": "string",
+      "custom": "com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons",
+      "customId": 10001
+    },
+    "customfield_10002": {
+      "type": "string",
+      "custom": "com.atlassian.jira.plugin.system.customfieldtypes:textarea",
+      "customId": 10002
+    },
+    "status": {
+      "type": "status",
+      "system": "status"
+    },
+    "labels": {
+      "type": "array",
+      "items": "string",
+      "system": "labels"
+    },
+    "assignee": {
+      "type": "user",
+      "system": "assignee"
+    },
+    "project": {
+      "type": "project",
+      "system": "project"
+    },
+    "versions": {
+      "type": "array",
+      "items": "version",
+      "system": "versions"
+    },
+    "timeestimate": {
+      "type": "number",
+      "system": "timeestimate"
+    },
+    "components": {
+      "type": "array",
+      "items": "component",
+      "system": "components"
+    },
+    "timeoriginalestimate": {
+      "type": "number",
+      "system": "timeoriginalestimate"
+    }
+  },
+  "changelog": {
+    "startAt": 0,
+    "maxResults": 0,
+    "total": 0,
+    "histories": []
+  }
+}

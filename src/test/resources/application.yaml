@@ -1,0 +1,143 @@
+jena:
+  security:
+    create: true
+    username: admin
+    password: admin
+  jira:
+    url: https://jira.atlassian.com
+    initial-updated-after: 2026-01-01T00:00:00
+    max-in-memory-size: 16MB
+    poll:
+      concurrency: 5
+    schedule:
+      cron: "*/30 * * * * *"
+      zone: Europe/Paris
+    snapshot:
+      default-zone: UTC
+      scheduler:
+        pool-size: 10
+    formatter:
+      date-pattern: "dd-MM-yyyy"
+      datetime-pattern: "dd-MM-yyyy HH:mm:SSS"
+    names:
+      fixVersions: "Fix Version"
+      versions: "Version"
+      components: "Component"
+  notification:
+    schedule:
+      cron: "0 * * * * *"
+      zone: Europe/Paris
+    telegram:
+      token: 1234567890:XXXXXXXXXXXXXXXXXXXXXXXXXX
+      parse-mode: html
+      remove-jira-formatting: true
+    express:
+      url:
+      bot-id:
+      secret-key:
+  retryer:
+    enabled: true
+    cron: "0 * * * * *"
+    zone: Europe/Paris
+    attempt: 3
+  proxy:
+    enabled: false
+    host:
+    port: 8080
+    non-proxy-hosts:
+    connection-timeout: 10s
+  tls:
+    cacert: "classpath:cacert.crt"
+  http:
+    wiretap: true
+server:
+  servlet:
+    context-path: /api/v1
+
+spring:
+  jackson:
+    deserialization:
+      fail-on-null-for-primitives: false
+    mapper:
+      accept-case-insensitive-enums: true
+  cloud:
+    config:
+      enabled: false
+  task:
+    scheduling:
+      pool:
+        size: 3
+  liquibase:
+    enabled: true
+    change-log: classpath:/db/db.changelog-master.yaml
+    default-schema: ${db.postgresql.default-schema}
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: postgres
+    url: jdbc:postgresql://${db.postgresql.address}:${db.postgresql.port}/${db.postgresql.dbname}
+    hikari:
+      #https://github.com/spring-projects/spring-boot/issues/4779
+      minimum-idle: 0
+      maximum-pool-size: 15
+      connection-timeout: 10000
+      idle-timeout: 300000
+      max-lifetime: 600000
+      initialization-fail-timeout: -1
+      validation-timeout: 1000
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+        default_schema: ${db.postgresql.default-schema}
+    show-sql: false
+  thymeleaf:
+    check-template-location: false
+    encoding: UTF-8
+db:
+  postgresql:
+    version: 17 #only for testscontainers
+    default-schema: public
+    dbname: postgres
+    address: localhost
+    port: 5432
+
+preliquibase:
+  enabled: true
+  continueOnError: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,refresh
+  endpoint:
+    health:
+      probes:
+        enabled: true
+    env:
+      show-values: when_authorized
+  info:
+    os:
+      enabled: true
+    java:
+      enabled: true
+
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    path: /api-docs
+
+logging:
+  level:
+    root: info
+  structured:
+    format:
+      console: ecs
+    ecs:
+      service:
+        name: jena
+        node-name: jena-node

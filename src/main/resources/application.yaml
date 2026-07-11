@@ -1,0 +1,142 @@
+jena:
+  security:
+    create:
+    username:
+    password:
+  jira:
+    url:
+    pat:
+    username:
+    password:
+    initial-updated-after:
+    max-in-memory-size:
+    poll:
+      concurrency: 1
+    schedule:
+      cron:
+      zone:
+    snapshot:
+      default-zone: UTC
+      scheduler:
+        pool-size: 1
+    formatter:
+      date-pattern:
+      datetime-pattern:
+  notification:
+    schedule:
+      cron:
+      zone:
+    telegram:
+      token:
+      parse-mode:
+      remove-jira-formatting:
+    express:
+      url:
+      bot-id:
+      secret-key:
+  retryer:
+    enabled:
+    cron:
+    zone:
+    attempt:
+  proxy:
+    enabled:
+    host:
+    port:
+    non-proxy-hosts:
+    connection-timeout:
+  tls:
+    cacert:
+  http:
+    wiretap: false
+    response-timeout: 60s
+    keep-alive: true
+    pool:
+      max-connections: 50
+      pending-acquire-timeout: 30s
+      max-idle-time: 30s
+      max-life-time: 5m
+      evict-in-background: 60s
+
+server:
+  servlet:
+    context-path: /api/v1
+
+spring:
+  jackson:
+    deserialization:
+      fail-on-null-for-primitives: false
+    mapper:
+      accept-case-insensitive-enums: true
+  cloud:
+    config:
+      enabled: false
+  task:
+    scheduling:
+      pool:
+        size: 3
+  liquibase:
+    enabled: false
+    change-log: classpath:/db/db.changelog-master.yaml
+    default-schema: ${db.postgresql.default-schema}
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    username:
+    password:
+    url: jdbc:postgresql://${db.postgresql.address}:${db.postgresql.port}/${db.postgresql.dbname}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        default_schema: ${db.postgresql.default-schema}
+  thymeleaf:
+    check-template-location: false
+    encoding: UTF-8
+
+db:
+  postgresql:
+    default-schema:
+    dbname:
+    address:
+    port:
+
+preliquibase:
+  enabled: false
+  continueOnError: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+    env:
+      show-values: when_authorized
+  info:
+    os:
+      enabled: true
+    java:
+      enabled: true
+
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    path: /api-docs
+
+logging:
+  level:
+    root: info
+    org.springframework.web.reactive.function.client.ExchangeFunctions: info
+    reactor.netty.http.client.HttpClient: info
+  structured:
+    format:
+      console: ecs
+    ecs:
+      service:
+        name: jena
+        node-name: jena-node

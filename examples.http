@@ -1,0 +1,561 @@
+###############################################################################
+# JENA — Jira External Notification Adapter — HTTP request examples
+#
+# All endpoints are served under the servlet context path `/api/v1` and require
+# HTTP Basic authentication. Roles:
+#   USER  -> Templates, Rules, Targets, Filters, Notifications
+#   ADMIN -> everything above + User management + Actuator
+#
+# The `Authorization: Basic {{user}} {{password}}` shorthand is encoded
+# automatically by the IntelliJ / VS Code HTTP client.
+#
+# Channel values (case-insensitive): telegram | jiraemail | express
+# Event values: ISSUE_CREATED | ISSUE_UPDATED
+###############################################################################
+
+@host = http://localhost:8080/api/v1
+@user = admin
+@password = admin
+
+
+###############################################################################
+# 0. Jira reference (not a JENA endpoint)
+# Inspect an issue together with its changelog. Useful for discovering the exact
+# field names / from-to values to use when authoring rules.
+###############################################################################
+
+### Fetch a Jira issues via jql search
+//@no-cookie-jar
+//@no-log
+GET https://jira.atlassian.com/rest/api/2/search?fields=key&startAt=0&jql=project in (JSWSERVER) and issuetype in (Bug) and updated >= "2026-01-01 00:00"
+#Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Fetch a Jira issue with changelog
+//@no-cookie-jar
+//@no-log
+GET https://jira.atlassian.com/rest/api/2/issue/JSWSERVER-26830?expand=changelog,names,schema&fields=-comment,-votes,-worklog
+#Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Fetch a Jira fields
+//@no-cookie-jar
+//@no-log
+GET https://jira.atlassian.com/rest/api/2/field
+#Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+
+###############################################################################
+# 1. Templates  (role: USER)
+# Properties: { name, content }
+# content keys: "telegram" | "jira-email" | "express", each { "message": "..." }
+###############################################################################
+
+### Create a template (Telegram + Jira email + Express)
+//@no-cookie-jar
+//@no-log
+POST {{host}}/templates
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "name": "Incident Alert",
+  "content": {
+    "telegram": {
+      "message": "<b>Incident <a th:href=\"@{${baseUrl.stringValue}+'/browse/'+${key.stringValue}}\">[(${key.stringValue})]</a>;</b>\n<i>Summary</i>: <b>[[${summary.stringValue}]];</b>\n<i>Reason</i>: <b>[[${customfield_11304?.stringValue}]];</b>\n<i>Start date</i>: <b>[[${#jena.formatZonedDateTime(#jena.parseZonedDateTime(customfield_11301?.value, 'yyyy-MM-dd''T''HH:mm:ssZ'), 'dd.MM.yyyy HH:mm')}]];</b>"
+    },
+    "jira-email": {
+      "message": "{\"subject\":\"[(${summary.stringValue})]\",\"htmlBody\":\"<table style='border-collapse: collapse; width: 100%;' border='1'> <tbody> <tr> <td style='width: 50%;'>Summary</td> <td style='width: 50%;'>[(${summary.stringValue})]</td> </tr> <tr> <td style='width: 50%;'>Description</td> <td style='width: 50%;'>[(${description?.stringValue})]</td> </tr> </tbody> </table>\",\"to\":{\"reporter\":false,\"assignee\":false,\"watchers\":false,\"voters\":false,\"users\":[{\"name\":\"alice\"}],\"groups\":[{\"name\":\"confluence-users\"}]}}"
+    },
+    "express": {
+      "message": "Incident [(${'[' + key.stringValue + ']'})]([(${baseUrl.stringValue})]/browse/[(${key.stringValue})])\n*Summary*: **[(${summary.stringValue})];**\n*Reason*: **[(${customfield_11304?.stringValue})];**"
+    }
+  }
+}
+
+### Create a minimal Telegram-only template
+# Inline expressions: [[ ]] = HTML-escaped, [( )] = unescaped output.
+//@no-cookie-jar
+//@no-log
+POST {{host}}/templates
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "name": "Task created",
+  "content": {
+    "telegram": {
+      "message": "<b><u>Task <a th:href=\"@{${baseUrl.stringValue}+'/browse/'+${key.stringValue}}\">[(${key.stringValue})]</a>;</u></b>\n<i>Summary</i>: <b>[[${summary.stringValue}]];</b>\n<i>Created</i>: <b>[[${created.stringValue}]];</b>\n<i>Description (escaped)</i>: <b>[[${description?.stringValue}]];</b>\n<i>Description (unescaped)</i>: <b>[(${description?.stringValue})];</b>"
+    }
+  }
+}
+
+### Update a template — body id MUST equal path id; full TemplateDto { id, name, content }
+//@no-cookie-jar
+//@no-log
+PUT {{host}}/templates/1
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "id": 1,
+  "name": "Incident Alert (updated)",
+  "content": {
+    "telegram": {
+      "message": "<i>Incident:</i>\n<b>Summary</b>: [(${summary.stringValue})]!\n<b>Description</b>: [[${description?.stringValue}]]!"
+    }
+  }
+}
+
+### Get a template by id
+//@no-cookie-jar
+//@no-log
+GET {{host}}/templates/1
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### List all templates
+//@no-cookie-jar
+//@no-log
+GET {{host}}/templates
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Delete a template (409 Conflict if still referenced by a rule)
+//@no-cookie-jar
+//@no-log
+DELETE {{host}}/templates/1
+Authorization: Basic {{user}} {{password}}
+
+
+###############################################################################
+# 2. Rules  (role: USER)
+# Properties: { template, enabled, event, field, from, fromString,
+#                  to, toString, hasChanged }
+# `field` is required when event = ISSUE_UPDATED.
+# from/fromString/to/toString are regex matchers; null = match any.
+###############################################################################
+
+### Create a rule — fire on issue creation
+//@no-cookie-jar
+//@no-log
+POST {{host}}/rules
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "template": 1,
+  "enabled": true,
+  "event": "ISSUE_CREATED"
+}
+
+### Create a rule — fire when status changes away from "Open" (but not to "Closed")
+//@no-cookie-jar
+//@no-log
+POST {{host}}/rules
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "template": 1,
+  "enabled": true,
+  "event": "ISSUE_UPDATED",
+  "field": "status",
+  "from": null,
+  "fromString": "Open",
+  "to": null,
+  "toString": "(^(?!Closed$).*$)",
+  "hasChanged": true
+}
+
+### Create a rule — fire when customfield "Support reference count" changes from 1 to 2
+//@no-cookie-jar
+//@no-log
+POST {{host}}/rules
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "template": 1,
+  "enabled": true,
+  "event": "ISSUE_UPDATED",
+  "field": "customfield_10610",
+  "from": null,
+  "fromString": "1",
+  "to": null,
+  "toString": "2",
+  "hasChanged": true
+}
+
+### Create a rule — fire on any assignee change
+//@no-cookie-jar
+//@no-log
+POST {{host}}/rules
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "template": 1,
+  "enabled": true,
+  "event": "ISSUE_UPDATED",
+  "field": "assignee",
+  "from": null,
+  "fromString": null,
+  "to": null,
+  "toString": null,
+  "hasChanged": true
+}
+
+### Update a rule — body id MUST equal path id; full RuleDto incl. `event`
+//@no-cookie-jar
+//@no-log
+PUT {{host}}/rules/1
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "id": 1,
+  "template": 2,
+  "enabled": true,
+  "event": "ISSUE_UPDATED",
+  "field": "status",
+  "from": "1",
+  "fromString": "Open",
+  "to": "4",
+  "toString": "Done",
+  "hasChanged": true
+}
+
+### Get a rule by id
+//@no-cookie-jar
+//@no-log
+GET {{host}}/rules/1
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### List all rules
+//@no-cookie-jar
+//@no-log
+GET {{host}}/rules
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Delete a rule
+//@no-cookie-jar
+//@no-log
+DELETE {{host}}/rules/1
+Authorization: Basic {{user}} {{password}}
+
+
+###############################################################################
+# 3. Notification targets  (role: USER)
+# Reusable chats (defined once, attached to many filters).
+# Properties: { name, channel, chatId, enabled }
+# channel: telegram | jiraemail | express
+# chatId is stored verbatim, including sign/prefix (e.g. -1001234567890, @channel).
+###############################################################################
+
+### Create a Telegram target
+//@no-cookie-jar
+//@no-log
+POST {{host}}/targets
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "name": "QA Telegram group",
+  "channel": "telegram",
+  "chatId": "-1001234567890",
+  "enabled": true
+}
+
+### Create an Express target
+//@no-cookie-jar
+//@no-log
+POST {{host}}/targets
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "name": "Dev Express chat",
+  "channel": "express",
+  "chatId": "2gf1f228-7g85-5y65-9w8e-815h38f50jcd",
+  "enabled": true
+}
+
+### Update a target — body id MUST equal path id; full NotificationTargetDto
+//@no-cookie-jar
+//@no-log
+PUT {{host}}/targets/1
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "id": 1,
+  "name": "QA Telegram group (renamed)",
+  "channel": "telegram",
+  "chatId": "-1009999999999",
+  "enabled": false
+}
+
+### Get a target by id
+//@no-cookie-jar
+//@no-log
+GET {{host}}/targets/1
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### List all targets
+//@no-cookie-jar
+//@no-log
+GET {{host}}/targets
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Delete a target
+//@no-cookie-jar
+//@no-log
+DELETE {{host}}/targets/1
+Authorization: Basic {{user}} {{password}}
+
+
+###############################################################################
+# 4. Filters  (role: USER)
+# Named base JQL + own poll watermark. The JQL is validated against Jira on
+# create/update (invalid JQL -> 400).
+# Properties: { name, jql, mode, templateId, scheduleCron, scheduleZone, enabled }
+#   mode (required): INCREMENTAL | SNAPSHOT
+#   INCREMENTAL -> change feed on the global poll; evaluates attached rules;
+#                  templateId/scheduleCron/scheduleZone MUST be null/omitted.
+#   SNAPSHOT    -> digest on its own cron; sends one message per matching issue
+#                  every run using the filter's template; has zero rules;
+#                  templateId (required) + scheduleCron (own cadence).
+###############################################################################
+
+### Create an INCREMENTAL filter (change feed; attach rules + targets)
+//@no-cookie-jar
+//@no-log
+POST {{host}}/filters
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "name": "Server bugs",
+  "jql": "project in ('JSWSERVER') and issuetype in ('Bug')",
+  "mode": "INCREMENTAL",
+  "enabled": true
+}
+
+### Create a SNAPSHOT filter — one message per matching issue, every run
+# templateId must reference an existing template; scheduleCron is this filter's
+# own cadence; scheduleZone is optional (falls back to jena.jira.snapshot.default-zone).
+//@no-cookie-jar
+//@no-log
+POST {{host}}/filters
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "name": "Open bugs daily digest",
+  "jql": "project in ('JSWSERVER') and issuetype in ('Bug') and status = 'Open'",
+  "mode": "SNAPSHOT",
+  "templateId": 1,
+  "scheduleCron": "0 0 8 * * *",
+  "scheduleZone": "Europe/Paris",
+  "enabled": true
+}
+
+### Update an INCREMENTAL filter
+//@no-cookie-jar
+//@no-log
+PUT {{host}}/filters/1
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "id": 1,
+  "name": "Server bugs & suggestions",
+  "jql": "project in ('JSWSERVER') and issuetype in ('Bug', 'Suggestion')",
+  "mode": "INCREMENTAL",
+  "templateId": null,
+  "scheduleCron": null,
+  "scheduleZone": null,
+  "enabled": true,
+  "targetIds": null,
+  "ruleIds": null
+}
+
+### Update a SNAPSHOT filter — SLA deadline has arrived.
+//@no-cookie-jar
+//@no-log
+PUT {{host}}/filters/2
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "id": 2,
+  "name": "SLA deadline has arrived",
+  "jql": "project in ('JSWSERVER') and issuetype in ('Bug') and cf[11300] >= now() and cf[11300] < '1m'",
+  "mode": "SNAPSHOT",
+  "templateId": 1,
+  "scheduleCron": "0 * * * * *",
+  "scheduleZone": "Europe/Paris",
+  "enabled": true,
+  "targetIds": null,
+  "ruleIds": null
+}
+
+### Get a filter by id (includes attached targetIds and ruleIds)
+//@no-cookie-jar
+//@no-log
+GET {{host}}/filters/1
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### List all filters
+//@no-cookie-jar
+//@no-log
+GET {{host}}/filters
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Attach a target to a filter
+//@no-cookie-jar
+//@no-log
+PUT {{host}}/filters/1/targets/1
+Authorization: Basic {{user}} {{password}}
+
+### Detach a target from a filter
+//@no-cookie-jar
+//@no-log
+DELETE {{host}}/filters/1/targets/1
+Authorization: Basic {{user}} {{password}}
+
+### Attach a rule to a filter
+//@no-cookie-jar
+//@no-log
+PUT {{host}}/filters/1/rules/1
+Authorization: Basic {{user}} {{password}}
+
+### Detach a rule from a filter
+//@no-cookie-jar
+//@no-log
+DELETE {{host}}/filters/1/rules/1
+Authorization: Basic {{user}} {{password}}
+
+### Delete a filter
+//@no-cookie-jar
+//@no-log
+DELETE {{host}}/filters/1
+Authorization: Basic {{user}} {{password}}
+
+
+###############################################################################
+# 5. Notifications  (role: USER)
+###############################################################################
+
+### Dry-run — render the message a rule would produce, without sending it
+# Params: ruleId, issueKey, channel (telegram | jiraemail | express)
+//@no-cookie-jar
+//@no-log
+POST {{host}}/notifications/dry-run?ruleId=1&issueKey=JSWSERVER-18&channel=telegram
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Dry-run against the Express channel
+//@no-cookie-jar
+//@no-log
+POST {{host}}/notifications/dry-run?ruleId=1&issueKey=JSWSERVER-18&channel=express
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Context — field context for the latest changelog group of an issue
+//@no-cookie-jar
+//@no-log
+GET {{host}}/notifications/JSWSERVER-26830/context
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Context — for a specific changelog group id
+# historyId is the Jira changelog group id.
+# You can find it via Jira REST API: GET /rest/api/2/issue/{key}?expand=changelog -> changelog.histories[].id
+//@no-cookie-jar
+//@no-log
+GET {{host}}/notifications/JSWSERVER-26830/context?historyId=10000
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Resend a previously failed notification by id
+//@no-cookie-jar
+//@no-log
+POST {{host}}/notifications/1/resend
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+
+###############################################################################
+# 6. User management  (role: ADMIN)
+# Properties: { username, password, roles[] }  roles: USER | ADMIN
+###############################################################################
+
+### Register a new API user
+//@no-cookie-jar
+//@no-log
+POST {{host}}/user/register
+Authorization: Basic {{user}} {{password}}
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "password": "password",
+  "roles": ["USER", "ADMIN"]
+}
+
+
+###############################################################################
+# 7. Actuator  (role: ADMIN)
+# Exposed web endpoints: health, info, metrics, refresh
+###############################################################################
+
+### Health (includes a custom `jira` connectivity indicator)
+//@no-cookie-jar
+//@no-log
+GET {{host}}/actuator/health
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Info
+//@no-cookie-jar
+//@no-log
+GET {{host}}/actuator/info
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Refresh externalized configuration (Spring Cloud Config)
+//@no-cookie-jar
+//@no-log
+POST {{host}}/actuator/refresh
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Metric — Jira polling run duration
+//@no-cookie-jar
+//@no-log
+GET {{host}}/actuator/metrics/jena.jira.poll
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Metric — notifications produced per channel/outcome
+//@no-cookie-jar
+//@no-log
+GET {{host}}/actuator/metrics/jena.notifications
+Authorization: Basic {{user}} {{password}}
+Accept: application/json
+
+### Metric — retry attempts
+//@no-cookie-jar
+//@no-log
+GET {{host}}/actuator/metrics/jena.retry.attempts
+Authorization: Basic {{user}} {{password}}
+Accept: application/json

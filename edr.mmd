@@ -1,0 +1,124 @@
+erDiagram
+    users {
+        varchar username PK
+        varchar password
+        boolean enabled
+    }
+
+    authorities {
+        varchar username FK
+        varchar authority
+    }
+
+    templates {
+        long id PK
+        varchar name
+        jsonb content
+        varchar created_by
+        timestamp created_at
+        varchar last_modified_by
+        timestamp updated_at
+    }
+
+    jira_filters {
+        long id PK
+        varchar name UK
+        varchar jql
+        boolean enabled
+        varchar mode
+        long template_id FK
+        varchar schedule_cron
+        varchar schedule_zone
+        varchar created_by
+        timestamp created_at
+        varchar last_modified_by
+        timestamp updated_at
+    }
+
+    notification_targets {
+        long id PK
+        varchar name
+        varchar channel
+        varchar chat_id
+        boolean enabled
+        varchar created_by
+        timestamp created_at
+        varchar last_modified_by
+        timestamp updated_at
+    }
+
+    rules {
+        long id PK
+        long template_id FK
+        boolean enabled
+        varchar event
+        varchar field
+        varchar from
+        varchar from_string
+        varchar to
+        varchar to_string
+        boolean has_changed
+        varchar created_by
+        timestamp created_at
+        varchar last_modified_by
+        timestamp updated_at
+    }
+
+    rule_filters {
+        long rule_id FK
+        long filter_id FK
+    }
+
+    filter_targets {
+        long filter_id FK
+        long target_id FK
+    }
+
+    changelog {
+        long id PK
+        varchar event
+        long item
+        int item_index
+        varchar key
+        long rule_id FK
+        long filter_id FK
+        jsonb context
+        varchar status
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    notification {
+        long id PK
+        long changelog_id FK
+        varchar issue_key
+        varchar channel
+        jsonb target
+        varchar content
+        varchar status
+        int failure_count
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    jira_search_run {
+        long id PK
+        long filter_id FK,UK
+        varchar base_url
+        timestamp last_run_time
+        timestamp last_success_run_time
+        varchar status
+        int failure_count
+    }
+
+    users ||--o{ authorities : has
+    rules ||--o{ rule_filters : "scoped by"
+    jira_filters ||--o{ rule_filters : "scopes"
+    jira_filters ||--o{ filter_targets : "routes via"
+    notification_targets ||--o{ filter_targets : "routed to by"
+    jira_filters ||--|| jira_search_run : "watermark"
+    jira_filters ||--o{ changelog : produces
+    templates |o--o{ jira_filters : "renders (snapshot)"
+    rules |{--|| templates : uses
+    changelog o{--|| rules : matches
+    changelog |o--o{ notification : produces
