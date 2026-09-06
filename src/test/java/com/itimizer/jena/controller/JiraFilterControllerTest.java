@@ -20,7 +20,7 @@ import com.itimizer.jena.service.JiraFilterService;
 import com.itimizer.jena.service.NotificationTargetService;
 import com.itimizer.jena.service.RuleService;
 import com.itimizer.jena.service.TemplateService;
-import com.itimizer.jena.service.impl.JiraJqlValidator;
+import com.itimizer.jena.service.JqlValidator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,7 +66,7 @@ class JiraFilterControllerTest {
     private TemplateService templateService;
 
     @MockitoBean
-    private JiraJqlValidator jiraJqlValidator;
+    private JqlValidator jqlValidator;
 
     @Autowired
     private JiraFilterRepository jiraFilterRepository;
@@ -132,7 +132,7 @@ class JiraFilterControllerTest {
         @DisplayName("should return 400 when JQL is invalid")
         void should_return_bad_request_when_jql_invalid() throws Exception {
             doThrow(new ValidationException("Invalid JQL"))
-                    .when(jiraJqlValidator).validate(eq("project = !!!"));
+                    .when(jqlValidator).validate(eq("project = !!!"));
 
             JiraFilterCreateDto dto = new JiraFilterCreateDto(
                     "Bad", "project = !!!", FilterMode.INCREMENTAL, null, null, null, true);

@@ -7,7 +7,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -23,6 +26,9 @@ class TemplateUtilTest {
 
     @Mock
     private DateTimeUtil dateTimeUtil;
+
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     private TemplateUtil templateUtil;
@@ -138,6 +144,62 @@ class TemplateUtilTest {
             assertThatThrownBy(() ->
                         templateUtil.formatZonedDateTime(zonedDateTime, "invalid-format"))
                     .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("json() method tests")
+    class JsonMethodTests {
+
+        @Test
+        @DisplayName("should parse valid JSON object into a navigable node")
+        void should_parse_valid_json_object_into_navigable_node() {
+            JsonNode result = templateUtil.json("{\"value\":\"High\",\"id\":\"3\"}");
+
+            assertThat(result.isObject()).isTrue();
+            assertThat(result.path("value").asString()).isEqualTo("High");
+            assertThat(result.path("id").asString()).isEqualTo("3");
+        }
+
+        @Test
+        @DisplayName("should navigate nested JSON objects")
+        void should_navigate_nested_json_objects() {
+            JsonNode result = templateUtil.json("{\"nested\":{\"id\":\"7\"}}");
+
+            assertThat(result.path("nested").path("id").asString()).isEqualTo("7");
+        }
+
+        @Test
+        @DisplayName("should fall back to default when a key is absent")
+        void should_fall_back_to_default_when_key_absent() {
+            JsonNode result = templateUtil.json("{\"id\":\"3\"}");
+
+            assertThat(result.path("value").isMissingNode()).isTrue();
+            assertThat(result.path("value").asString("raw")).isEqualTo("raw");
+        }
+
+        @Test
+        @DisplayName("should return missing node for null input")
+        void should_return_missing_node_for_null_input() {
+            assertThat(templateUtil.json(null).isMissingNode()).isTrue();
+        }
+
+        @Test
+        @DisplayName("should return missing node for blank input")
+        void should_return_missing_node_for_blank_input() {
+            assertThat(templateUtil.json("   ").isMissingNode()).isTrue();
+        }
+
+        @Test
+        @DisplayName("should return missing node for non-JSON input")
+        void should_return_missing_node_for_non_json_input() {
+            assertThat(templateUtil.json("foo").isMissingNode()).isTrue();
+        }
+
+        @Test
+        @DisplayName("should return missing node for malformed JSON")
+        void should_return_missing_node_for_malformed_json() {
+            assertThat(templateUtil.json("{\"value\":").isMissingNode()).isTrue();
         }
     }
 }

@@ -9,18 +9,15 @@ import com.itimizer.jena.domain.JiraUser;
 import com.itimizer.jena.entity.JiraFilter;
 import com.itimizer.jena.entity.JiraSearchRun;
 import com.itimizer.jena.entity.Status;
+import com.itimizer.jena.exception.RequestFailedException;
 import com.itimizer.jena.repository.JiraFilterRepository;
 import com.itimizer.jena.repository.JiraSearchRunRepository;
+import com.itimizer.jena.service.JiraSearchClient;
 import com.itimizer.jena.service.JiraSearchResultService;
 import com.itimizer.jena.service.JiraUserService;
 import com.itimizer.jena.transactionalmanager.TransactionRunner;
 import com.itimizer.jena.util.DateTimeUtil;
 import com.itimizer.jena.util.JiraUtil;
-import io.netty.channel.ChannelOption;
-import io.netty.handler.timeout.ReadTimeoutException;
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.MockWebServer;
-import okhttp3.mockwebserver.SocketPolicy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,29 +29,20 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpServerErrorException;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
-import reactor.netty.http.client.HttpClient;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @WithMockUser(roles = "USER")
@@ -82,45 +70,16 @@ class JiraSearchResultServiceImplTest {
     private JiraUserService jiraUserService;
     @Mock
     private JiraUtil jiraUtil;
+    @Mock
+    private JiraSearchClient jiraSearchClient;
 
-    private MockWebServer mockWebServer;
-    private WebClient webClient;
     private JiraSearchResultServiceImpl jiraSearchResultService;
-    private String issuesSearchResponse;
-    private String issuesSearchResponseEmpty;
-    private String issuesSearchResponsePage1;
-    private String issuesSearchResponsePage2;
     private JiraUser jiraUser;
     private LocalDateTime initialUpdatedAfter;
     private JiraFilter filter;
 
     @BeforeEach
     void setUp() throws IOException {
-        mockWebServer = new MockWebServer();
-        mockWebServer.start();
-
-        HttpClient httpClient = HttpClient.create()
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 100)
-                .responseTimeout(Duration.ofMillis(100));
-
-        webClient = WebClient.builder()
-                .baseUrl(mockWebServer.url("/").toString())
-                .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .build();
-
-        issuesSearchResponse = new String(new ClassPathResource("json/search/issues.json")
-                .getInputStream().readAllBytes());
-        issuesSearchResponseEmpty = new String(
-                new ClassPathResource("json/search/issues-empty.json")
-                        .getInputStream().readAllBytes());
-        issuesSearchResponsePage1 = new String(
-                new ClassPathResource("json/search/issues-page1.json")
-                        .getInputStream().readAllBytes());
-        issuesSearchResponsePage2 = new String(
-                new ClassPathResource("json/search/issues-page2.json")
-                        .getInputStream().readAllBytes());
-
-
         jiraSearchResultService = new JiraSearchResultServiceImpl(
                 transactionRunner,
                 applicationProperties,
@@ -128,7 +87,7 @@ class JiraSearchResultServiceImplTest {
                 jiraUserService,
                 jiraUtil,
                 dateTimeUtil,
-                webClient
+                jiraSearchClient
         );
 
         ObjectMapper objectMapper = new ObjectMapper();
@@ -146,93 +105,65 @@ class JiraSearchResultServiceImplTest {
     }
 
     @AfterEach
-    void tearDown() throws IOException {
+    void tearDown() {
         jiraSearchRunRepository.deleteAll();
-        mockWebServer.shutdown();
     }
 
     @Nested
-    @DisplayName("fetchAllJiraSearchResult() method tests")
-    class FetchAllJiraSearchResultTests {
+    @DisplayName("search delegation tests")
+    class SearchDelegationTests {
 
         @Test
-        @DisplayName("should fetch all pages of search results")
-        void should_fetch_all_pages() {
+        @DisplayName("should search the windowed JQL and return what the client found")
+        void should_search_windowed_jql() {
             LocalDateTime updated = LocalDateTime.now();
-            when(jiraUtil.getJiraSearchJql(filter.getJql(), updated))
-                    .thenReturn("project in ('TST') and updated >= '2026-01-01'");
-
-            mockWebServer.enqueue(new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .setBody(issuesSearchResponsePage1));
-
-            mockWebServer.enqueue(new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .setBody(issuesSearchResponsePage2));
+            String windowedJql = "(project = TST) and updated >= '2026-01-01 00:00'";
+            JiraSearchResult expected = new JiraSearchResult(
+                    List.of(JiraIssueKey.builder().key("TST-1").build()));
+            when(jiraUtil.getJiraSearchJql(filter.getJql(), updated)).thenReturn(windowedJql);
+            when(jiraSearchClient.searchAllKeys(windowedJql, filter.getName()))
+                    .thenReturn(expected);
 
             JiraSearchResult result =
                     jiraSearchResultService.fetchAllJiraSearchResult(filter, updated);
-            assertThat(result).isNotNull();
-            assertThat(result.getIssues()).hasSize(2);
-            assertThat(result.getIssues()).extracting(JiraIssueKey::getKey)
-                    .contains("TST-1", "TST-2");
-            assertThat(mockWebServer.getRequestCount()).isEqualTo(2);
+            assertThat(result).isSameAs(expected);
+            verify(jiraSearchClient).searchAllKeys(windowedJql, filter.getName());
         }
 
         @Test
-        @DisplayName("should handle single page result")
-        void should_handle_single_page() {
-            LocalDateTime updated = LocalDateTime.now();
-            when(jiraUtil.getJiraSearchJql(filter.getJql(), updated))
-                    .thenReturn("project in ('TST') and updated >= '2026-01-01'");
+        @DisplayName("should search the raw filter JQL for a snapshot")
+        void should_search_raw_jql_for_snapshot() {
+            JiraSearchResult expected = new JiraSearchResult(
+                    List.of(JiraIssueKey.builder().key("TST-1").build()));
+            when(jiraSearchClient.searchAllKeys(filter.getJql(), filter.getName()))
+                    .thenReturn(expected);
 
-            mockWebServer.enqueue(new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .setBody(issuesSearchResponse));
-
-            JiraSearchResult result =
-                    jiraSearchResultService.fetchAllJiraSearchResult(filter, updated);
-            assertThat(result).isNotNull();
-            assertThat(result.getIssues()).hasSize(8);
-            assertThat(mockWebServer.getRequestCount()).isEqualTo(1);
+            JiraSearchResult result = jiraSearchResultService.fetchSnapshotSearchResult(filter);
+            assertThat(result).isSameAs(expected);
+            verify(jiraSearchClient).searchAllKeys(filter.getJql(), filter.getName());
         }
 
         @Test
-        @DisplayName("should throw exception when first page fails")
-        void should_throw_exception_when_first_page_fails() {
+        @DisplayName("should return null when the client returns null")
+        void should_return_null_when_client_returns_null() {
             LocalDateTime updated = LocalDateTime.now();
-            when(jiraUtil.getJiraSearchJql(filter.getJql(), updated))
-                    .thenReturn("project in ('TST') and updated >= '2026-01-01'");
+            when(jiraUtil.getJiraSearchJql(filter.getJql(), updated)).thenReturn("jql query");
+            when(jiraSearchClient.searchAllKeys("jql query", filter.getName())).thenReturn(null);
 
-            mockWebServer.enqueue(new MockResponse()
-                    .setResponseCode(500)
-                    .setBody("Server Error"));
+            assertThat(jiraSearchResultService.fetchAllJiraSearchResult(filter, updated)).isNull();
+        }
+
+        @Test
+        @DisplayName("should propagate a client failure")
+        void should_propagate_client_failure() {
+            LocalDateTime updated = LocalDateTime.now();
+            when(jiraUtil.getJiraSearchJql(filter.getJql(), updated)).thenReturn("jql query");
+            when(jiraSearchClient.searchAllKeys("jql query", filter.getName()))
+                    .thenThrow(new RequestFailedException("page failed"));
 
             assertThatThrownBy(() ->
                     jiraSearchResultService.fetchAllJiraSearchResult(filter, updated))
-                    .isInstanceOf(HttpServerErrorException.class);
-        }
-
-        @Test
-        @DisplayName("should handle empty result")
-        void should_handle_empty_result() {
-            LocalDateTime updated = LocalDateTime.now();
-            when(jiraUtil.getJiraSearchJql(filter.getJql(), updated))
-                    .thenReturn("project in ('TST') and updated >= '2026-01-01'");
-
-            mockWebServer.enqueue(new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .setBody(issuesSearchResponseEmpty));
-
-            JiraSearchResult result =
-                    jiraSearchResultService.fetchAllJiraSearchResult(filter, updated);
-            assertThat(result).isNotNull();
-            assertThat(result.getIssues()).isEmpty();
-            assertThat(result.getTotal()).isEqualTo(0);
+                    .isInstanceOf(RequestFailedException.class);
         }
 
         @Test
@@ -242,52 +173,6 @@ class JiraSearchResultServiceImplTest {
             assertThatThrownBy(() ->
                     jiraSearchResultService.fetchAllJiraSearchResult(filter, null))
                     .isInstanceOf(NullPointerException.class);
-        }
-
-        @Test
-        @DisplayName("should throw exception when network timeout")
-        void should_throw_exception_when_network_timeout() {
-            LocalDateTime updated = LocalDateTime.now();
-            when(jiraUtil.getJiraSearchJql(filter.getJql(), updated)).thenReturn("jql query");
-
-            mockWebServer.enqueue(new MockResponse()
-                    .setBodyDelay(1, TimeUnit.SECONDS)
-                    .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .setBody(issuesSearchResponse)
-                    .setResponseCode(200));
-
-            assertThatThrownBy(() ->
-                    jiraSearchResultService.fetchAllJiraSearchResult(filter, updated))
-                    .isInstanceOf(Exception.class)
-                    .hasRootCauseInstanceOf(ReadTimeoutException.class);
-        }
-
-        @Test
-        @DisplayName("should throw exception when network connection error")
-        void should_throw_exception_when_network_connection_error() {
-            LocalDateTime updated = LocalDateTime.now();
-            when(jiraUtil.getJiraSearchJql(filter.getJql(), updated)).thenReturn("jql query");
-            mockWebServer.enqueue(new MockResponse()
-                    .setSocketPolicy(SocketPolicy.DISCONNECT_AT_START));
-
-            assertThatThrownBy(() ->
-                    jiraSearchResultService.fetchAllJiraSearchResult(filter, updated))
-                    .isInstanceOf(WebClientRequestException.class);
-        }
-
-        @Test
-        @DisplayName("should throw exception when Bad Request error")
-        void should_throw_exception_when_bad_request_error() {
-            LocalDateTime updated = LocalDateTime.now();
-            when(jiraUtil.getJiraSearchJql(filter.getJql(), updated)).thenReturn("jql query");
-
-            mockWebServer.enqueue(new MockResponse()
-                    .setResponseCode(400)
-                    .setBody("{\"errorMessages\":[\"The value 'TST' does not exist.\"]}"));
-
-            assertThatThrownBy(() ->
-                    jiraSearchResultService.fetchAllJiraSearchResult(filter, updated))
-                    .isInstanceOf(HttpClientErrorException.class);
         }
     }
 
@@ -375,7 +260,7 @@ class JiraSearchResultServiceImplTest {
                     jiraUserService,
                     jiraUtil,
                     dateTimeUtil,
-                    webClient
+                    jiraSearchClient
             );
 
             issues = List.of(
@@ -406,7 +291,7 @@ class JiraSearchResultServiceImplTest {
             lenient().when(applicationProperties.getJira()).thenReturn(jiraProperties);
             lenient().when(jiraProperties.getUrl()).thenReturn("https://jira.example.com");
 
-            JiraSearchResult jiraSearchResult = new JiraSearchResult(0, 50, 2, issues);
+            JiraSearchResult jiraSearchResult = new JiraSearchResult(issues);
 
             JiraSearchRun result = searchResultService
                     .saveJiraSearchResult(persistedFilter, jiraSearchResult, runTime);
@@ -444,7 +329,7 @@ class JiraSearchResultServiceImplTest {
                     searchResultService.saveJiraSearchResult(persistedFilter, null, runTime);
             assertThat(failedTwice.getFailureCount()).isEqualTo(2);
 
-            JiraSearchResult jiraSearchResult = new JiraSearchResult(0, 50, 1, issues);
+            JiraSearchResult jiraSearchResult = new JiraSearchResult(issues);
             JiraSearchRun succeeded = searchResultService
                     .saveJiraSearchResult(persistedFilter, jiraSearchResult, runTime);
             assertThat(succeeded.getFailureCount()).isEqualTo(0);
@@ -455,7 +340,7 @@ class JiraSearchResultServiceImplTest {
         @DisplayName("should throw exception when runTime is null")
         @SuppressWarnings("ConstantConditions")
         void should_throw_exception_when_run_time_is_null() {
-            JiraSearchResult jiraSearchResult = new JiraSearchResult(0, 50, 2, issues);
+            JiraSearchResult jiraSearchResult = new JiraSearchResult(issues);
 
             assertThatThrownBy(() -> jiraSearchResultService
                         .saveJiraSearchResult(persistedFilter, jiraSearchResult, null))

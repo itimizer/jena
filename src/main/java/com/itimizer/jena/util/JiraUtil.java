@@ -280,17 +280,17 @@ public class JiraUtil {
         templateContext.put("creator", jiraIssue.getCreator() == null
                 ? new TemplateField()
                 : new TemplateField(
-                    jiraIssue.getCreator().getKey(),
+                    jiraIssue.getCreator().getIdentifier(),
                     jiraIssue.getCreator().getDisplayName()));
         templateContext.put("reporter", jiraIssue.getReporter() == null
                 ? new TemplateField()
                 : new TemplateField(
-                    jiraIssue.getReporter().getKey(),
+                    jiraIssue.getReporter().getIdentifier(),
                     jiraIssue.getReporter().getDisplayName()));
         templateContext.put("assignee", jiraIssue.getAssignee() == null
                 ? new TemplateField()
                 : new TemplateField(
-                    jiraIssue.getAssignee().getKey(),
+                    jiraIssue.getAssignee().getIdentifier(),
                     jiraIssue.getAssignee().getDisplayName()));
         templateContext.put("resolution", jiraIssue.getResolution() == null
                 ? new TemplateField()

@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -77,9 +78,41 @@ class ExpressJwtServiceTest {
         long iat = claims.getIssuedAt().toInstant().getEpochSecond();
         long nbf = claims.getNotBefore().toInstant().getEpochSecond();
         long exp = claims.getExpiration().toInstant().getEpochSecond();
-        assertThat(iat).isBetween(before, after);
+        assertThat(iat).isBetween(before - 30, after - 30);
         assertThat(nbf).isEqualTo(iat);
-        assertThat(exp).isEqualTo(iat + 60);
+        assertThat(exp).isBetween(before + 300, after + 300);
+    }
+
+    @Test
+    @DisplayName("should expire the token after the configured ttl")
+    void should_expire_token_after_configured_ttl() {
+        express.setBotId(BOT_ID);
+        express.setSecretKey(SECRET_KEY);
+        express.setUrl(EXPRESS_URL);
+        express.setTokenTtl(Duration.ofMinutes(15));
+        when(stringUtil.getHostUrl(EXPRESS_URL)).thenReturn(HOST_URL);
+
+        long before = Instant.now().getEpochSecond();
+        SecretKey key = Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8));
+        Claims claims = parseClaims(expressJwtService.generateToken(), key);
+        long after = Instant.now().getEpochSecond();
+
+        long exp = claims.getExpiration().toInstant().getEpochSecond();
+        assertThat(exp).isBetween(before + 900, after + 900);
+    }
+
+    @Test
+    @DisplayName("should backdate notBefore so small clock skew does not invalidate the token")
+    void should_backdate_not_before_for_clock_skew() {
+        express.setBotId(BOT_ID);
+        express.setSecretKey(SECRET_KEY);
+        express.setUrl(EXPRESS_URL);
+        when(stringUtil.getHostUrl(EXPRESS_URL)).thenReturn(HOST_URL);
+
+        SecretKey key = Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8));
+        Claims claims = parseClaims(expressJwtService.generateToken(), key);
+
+        assertThat(claims.getNotBefore().toInstant()).isBefore(Instant.now());
     }
 
     @Test

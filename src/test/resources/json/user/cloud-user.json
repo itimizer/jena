@@ -1,0 +1,15 @@
+{
+  "self": "https://example.atlassian.net/rest/api/2/user?accountId=557058%3A923465e9-d83e-4798-9aa3-7f36f5602e57",
+  "accountId": "557058:923465e9-d83e-4798-9aa3-7f36f5602e57",
+  "accountType": "atlassian",
+  "avatarUrls": {
+    "48x48": "https://avatar-management.example/48",
+    "24x24": "https://avatar-management.example/24",
+    "16x16": "https://avatar-management.example/16",
+    "32x32": "https://avatar-management.example/32"
+  },
+  "displayName": "Administrator",
+  "active": true,
+  "timeZone": "Antarctica/Troll",
+  "locale": "en_UK"
+}

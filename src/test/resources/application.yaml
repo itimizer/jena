@@ -5,6 +5,7 @@ jena:
     password: admin
   jira:
     url: https://jira.atlassian.com
+    deployment-type: server
     initial-updated-after: 2026-01-01T00:00:00
     max-in-memory-size: 16MB
     poll:

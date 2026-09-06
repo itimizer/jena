@@ -47,6 +47,81 @@ class ApplicationPropertiesValidationTest {
     }
 
     @Test
+    @DisplayName("should default deployment-type to SERVER when absent")
+    void should_default_deployment_type_to_server() {
+        contextRunner
+                .withPropertyValues("jena.jira.url=https://jira.example.com")
+                .run(context -> assertThat(context)
+                        .getBean(ApplicationProperties.class)
+                        .extracting(properties -> properties.getJira().getDeploymentType())
+                        .isEqualTo(ApplicationProperties.Jira.DeploymentType.SERVER));
+    }
+
+    @Test
+    @DisplayName("should bind deployment-type cloud")
+    void should_bind_deployment_type_cloud() {
+        contextRunner
+                .withPropertyValues(
+                        "jena.jira.url=https://jira.example.com",
+                        "jena.jira.deployment-type=cloud")
+                .run(context -> assertThat(context)
+                        .getBean(ApplicationProperties.class)
+                        .extracting(properties -> properties.getJira().getDeploymentType())
+                        .isEqualTo(ApplicationProperties.Jira.DeploymentType.CLOUD));
+    }
+
+    @Test
+    @DisplayName("should fail to start when deployment-type is not a known value")
+    void should_fail_when_deployment_type_is_unknown() {
+        contextRunner
+                .withPropertyValues(
+                        "jena.jira.url=https://jira.example.com",
+                        "jena.jira.deployment-type=datacenter")
+                .run(context -> assertThat(context)
+                        .hasFailed()
+                        .getFailure()
+                        .hasStackTraceContaining("jena.jira.deployment-type"));
+    }
+
+    @Test
+    @DisplayName("should fail to start when a PAT is configured against Jira Cloud")
+    void should_fail_when_pat_configured_with_cloud() {
+        contextRunner
+                .withPropertyValues(
+                        "jena.jira.url=https://example.atlassian.net",
+                        "jena.jira.deployment-type=cloud",
+                        "jena.jira.pat=my-secret-token")
+                .run(context -> assertThat(context)
+                        .hasFailed()
+                        .getFailure()
+                        .hasStackTraceContaining("Jira Cloud does not accept Personal Access "
+                                + "Tokens"));
+    }
+
+    @Test
+    @DisplayName("should start when Jira Cloud is configured with username and password")
+    void should_start_when_cloud_configured_with_basic_auth() {
+        contextRunner
+                .withPropertyValues(
+                        "jena.jira.url=https://example.atlassian.net",
+                        "jena.jira.deployment-type=cloud",
+                        "jena.jira.username=user@example.com",
+                        "jena.jira.password=my-api-token")
+                .run(context -> assertThat(context).hasNotFailed());
+    }
+
+    @Test
+    @DisplayName("should start when a PAT is configured against Jira Server")
+    void should_start_when_pat_configured_with_server() {
+        contextRunner
+                .withPropertyValues(
+                        "jena.jira.url=https://jira.example.com",
+                        "jena.jira.deployment-type=server",
+                        "jena.jira.pat=my-secret-token")
+                .run(context -> assertThat(context).hasNotFailed());
+    }
+
+    @Test
     @DisplayName("should fail to start when retryer is enabled but attempt is unset")
     void should_fail_when_retryer_enabled_without_attempt() {
         contextRunner

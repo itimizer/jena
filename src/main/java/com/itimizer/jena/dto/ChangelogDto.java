@@ -1,7 +1,7 @@
 package com.itimizer.jena.dto;
 
-import com.itimizer.jena.entity.Event;
 import com.itimizer.jena.entity.Changelog;
+import com.itimizer.jena.entity.Event;
 import com.itimizer.jena.entity.Status;
 
 import java.util.Map;

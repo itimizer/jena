@@ -5,8 +5,8 @@ import com.itimizer.jena.domain.JiraSearchResult;
 import com.itimizer.jena.entity.JiraFilter;
 import com.itimizer.jena.entity.JiraSearchRun;
 import com.itimizer.jena.entity.Status;
-import com.itimizer.jena.exception.RequestFailedException;
 import com.itimizer.jena.repository.JiraSearchRunRepository;
+import com.itimizer.jena.service.JiraSearchClient;
 import com.itimizer.jena.service.JiraSearchResultService;
 import com.itimizer.jena.service.JiraUserService;
 import com.itimizer.jena.transactionalmanager.TransactionRunner;
@@ -14,24 +14,21 @@ import com.itimizer.jena.util.DateTimeUtil;
 import com.itimizer.jena.util.JiraUtil;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
 /**
- * {@link JiraSearchResultService} over the Jira search endpoint. Fetches keys only, walking all
- * result pages, and persists the per-filter {@link JiraSearchRun} cursor. The cursor's
- * last-successful-run time is the watermark and only advances on a successful run, so a failed poll
- * never skips a window.
+ * {@link JiraSearchResultService} built on the deployment-specific {@link JiraSearchClient}. Owns
+ * the version-independent half of a poll: the search window, and the per-filter
+ * {@link JiraSearchRun} cursor. The cursor's last-successful-run time is the watermark and only
+ * advances on a successful run, so a failed poll never skips a window.
  */
 @Slf4j
 @Service
-public class JiraSearchResultServiceImpl extends AbstractJiraClient
-        implements JiraSearchResultService {
+public class JiraSearchResultServiceImpl implements JiraSearchResultService {
 
     private final TransactionRunner transactionRunner;
     private final ApplicationProperties applicationProperties;
@@ -39,6 +36,7 @@ public class JiraSearchResultServiceImpl extends AbstractJiraClient
     private final JiraUserService jiraUserService;
     private final JiraUtil jiraUtil;
     private final DateTimeUtil dateTimeUtil;
+    private final JiraSearchClient jiraSearchClient;
 
     public JiraSearchResultServiceImpl(TransactionRunner transactionRunner,
                                        ApplicationProperties applicationProperties,
@@ -46,8 +44,8 @@ public class JiraSearchResultServiceImpl extends AbstractJiraClient
                                        JiraUserService jiraUserService,
                                        JiraUtil jiraUtil,
                                        DateTimeUtil dateTimeUtil,
-                                       @Qualifier("jiraWebClient") WebClient webClient) {
-        super(webClient);
+                                       JiraSearchClient jiraSearchClient) {
+        this.jiraSearchClient = jiraSearchClient;
         this.transactionRunner = transactionRunner;
         this.applicationProperties = applicationProperties;
         this.jiraSearchRunRepository = jiraSearchRunRepository;
@@ -59,61 +57,13 @@ public class JiraSearchResultServiceImpl extends AbstractJiraClient
     @Override
     public JiraSearchResult fetchAllJiraSearchResult(@NonNull JiraFilter filter,
                                                      @NonNull LocalDateTime updated) {
-        return fetchAllPaged(jiraUtil.getJiraSearchJql(filter.getJql(), updated), filter.getName());
+        return jiraSearchClient.searchAllKeys(
+                jiraUtil.getJiraSearchJql(filter.getJql(), updated), filter.getName());
     }
 
     @Override
     public JiraSearchResult fetchSnapshotSearchResult(@NonNull JiraFilter filter) {
-        return fetchAllPaged(filter.getJql(), filter.getName());
-    }
-
-    /**
-     * Runs the search and accumulates every page into a single result. Progress is tracked by the
-     * number of issues actually received rather than the server-echoed cursor, so a page that
-     * arrives null or empty while issues remain fails the run — advancing the watermark past
-     * unseen issues would lose them silently.
-     */
-    private JiraSearchResult fetchAllPaged(@NonNull String jql, @NonNull String filterName) {
-        log.debug("Starting Fetching Jira Search Result for filter {} with JQL: {}",
-                filterName, jql);
-        var res = fetchJiraSearchResult(jql, 0);
-
-        if (res != null) {
-            var received = (long) res.getIssues().size();
-
-            while (received < res.getTotal()) {
-                var page = fetchJiraSearchResult(jql, received);
-
-                if (page == null || page.getIssues().isEmpty()) {
-                    throw new RequestFailedException(
-                            "Search page at " + received + " for filter " + filterName
-                                    + " returned no issues while "
-                                    + (res.getTotal() - received) + " remain");
-                }
-                res.getIssues().addAll(page.getIssues());
-                received += page.getIssues().size();
-            }
-            res.setStartAt(received);
-        }
-
-        log.debug("Completed fetch Jira Search Result for filter {}", filterName);
-        log.trace("Fetched Jira Search Result: {}", res);
-        return res;
-    }
-
-    private JiraSearchResult fetchJiraSearchResult(@NonNull String jql, long startAt) {
-        return fetch(
-                jiraWebClient()
-                        .get()
-                        .uri(uriBuilder -> uriBuilder
-                                .path("/rest/api/2/search")
-                                .queryParam("fields", "key")
-                                .queryParam("startAt", startAt)
-                                .queryParam("jql", jql)
-                                .build()),
-                JiraSearchResult.class,
-                "fetching jira search result",
-                true);
+        return jiraSearchClient.searchAllKeys(filter.getJql(), filter.getName());
     }
 
     /**

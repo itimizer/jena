@@ -1,0 +1,14 @@
+{
+  "queries": [
+    {
+      "query": "project = TST",
+      "structure": {
+        "where": {
+          "field": {"name": "project"},
+          "operator": "=",
+          "operand": {"value": "TST"}
+        }
+      }
+    }
+  ]
+}

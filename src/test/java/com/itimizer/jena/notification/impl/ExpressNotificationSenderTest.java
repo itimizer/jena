@@ -38,6 +38,7 @@ class ExpressNotificationSenderTest {
 
     private ExpressNotificationSender expressSender;
     private MockWebServer mockWebServer;
+    private JwtService jwtService;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -57,7 +58,7 @@ class ExpressNotificationSenderTest {
         ObjectProvider<WebClient> webClientProvider = mock(ObjectProvider.class);
         when(webClientProvider.getIfAvailable()).thenReturn(webClient);
 
-        JwtService jwtService = mock(JwtService.class);
+        jwtService = mock(JwtService.class);
         lenient().when(jwtService.generateToken()).thenReturn("test-jwt-token");
 
         expressSender = new ExpressNotificationSender(
@@ -125,12 +126,10 @@ class ExpressNotificationSenderTest {
     }
 
     @Test
-    @DisplayName("should handle Unauthorized error")
+    @DisplayName("should handle Unauthorized error after retrying once")
     void should_handle_unauthorized_error() {
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(401)
-                .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .setBody("{\"ok\":false,\"error_code\":401,\"description\":\"Unauthorized\"}"));
+        mockWebServer.enqueue(unauthorizedResponse());
+        mockWebServer.enqueue(unauthorizedResponse());
 
         NotificationMessageDto payload =
                 new NotificationMessageDto("PROJ-123", "123456", "Test message");
@@ -140,6 +139,32 @@ class ExpressNotificationSenderTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody()).contains("Error calling Express API");
+        assertThat(mockWebServer.getRequestCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("should retry Unauthorized once with a freshly minted token")
+    void should_retry_unauthorized_with_fresh_token() throws InterruptedException {
+        when(jwtService.generateToken()).thenReturn("expired-token", "fresh-token");
+        mockWebServer.enqueue(unauthorizedResponse());
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .setBody("{\"status\":\"ok\"}"));
+
+        NotificationMessageDto payload =
+                new NotificationMessageDto("PROJ-123", "123456", "Test message");
+
+        ResponseEntity<String> response = expressSender.send(payload);
+        assertThat(response).isNotNull();
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        RecordedRequest first = mockWebServer.takeRequest(1, TimeUnit.SECONDS);
+        RecordedRequest second = mockWebServer.takeRequest(1, TimeUnit.SECONDS);
+        assertThat(first).isNotNull();
+        assertThat(second).isNotNull();
+        assertThat(first.getHeader(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer expired-token");
+        assertThat(second.getHeader(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer fresh-token");
     }
 
     @Test
@@ -192,5 +217,12 @@ class ExpressNotificationSenderTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody()).contains("Failed to send");
+    }
+
+    private MockResponse unauthorizedResponse() {
+        return new MockResponse()
+                .setResponseCode(401)
+                .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .setBody("{\"reason\":\"unauthorized\",\"status\":\"error\"}");
     }
 }

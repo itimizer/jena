@@ -127,7 +127,7 @@ public class SchedulerServiceImpl implements SchedulerService {
                     filter.getName());
             return;
         }
-        for (var issueKey : jiraSearchResult.getIssues()) {
+        for (var issueKey : jiraSearchResult.issues()) {
             log.trace("Fetching JiraIssue: {}", issueKey.getKey());
             var jiraIssue = jiraIssueService.fetchJiraIssue(issueKey.getKey());
 
@@ -238,11 +238,11 @@ public class SchedulerServiceImpl implements SchedulerService {
             }
             var result = jiraSearchResultService.fetchSnapshotSearchResult(filter);
 
-            if (result == null || result.getIssues().isEmpty()) {
+            if (result == null || result.issues().isEmpty()) {
                 log.debug("Snapshot filter {} returned no issues", filter.getName());
                 return;
             }
-            for (var issueKey : result.getIssues()) {
+            for (var issueKey : result.issues()) {
                 digestIssueSafely(filter, issueKey.getKey());
             }
         } catch (Exception e) {

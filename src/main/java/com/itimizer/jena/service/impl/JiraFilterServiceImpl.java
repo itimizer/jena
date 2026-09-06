@@ -14,6 +14,7 @@ import com.itimizer.jena.repository.NotificationTargetRepository;
 import com.itimizer.jena.repository.RuleRepository;
 import com.itimizer.jena.repository.TemplateRepository;
 import com.itimizer.jena.service.JiraFilterService;
+import com.itimizer.jena.service.JqlValidator;
 import com.itimizer.jena.transactionalmanager.TransactionRunner;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -43,13 +44,13 @@ public class JiraFilterServiceImpl implements JiraFilterService {
     private final RuleRepository ruleRepository;
     private final TemplateRepository templateRepository;
     private final JiraFilterMapper jiraFilterMapper;
-    private final JiraJqlValidator jiraJqlValidator;
+    private final JqlValidator jqlValidator;
     private final TransactionRunner transactionRunner;
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public JiraFilterDto create(@NonNull JiraFilterCreateDto dto) {
-        jiraJqlValidator.validate(dto.jql());
+        jqlValidator.validate(dto.jql());
         var template = validateAndResolveTemplate(dto.mode(), dto.templateId(),
                 dto.scheduleCron(), dto.scheduleZone());
         var filter = jiraFilterMapper.fromDto(dto);
@@ -64,7 +65,7 @@ public class JiraFilterServiceImpl implements JiraFilterService {
 
     @Override
     public JiraFilterDto update(@NonNull JiraFilterDto dto) {
-        jiraJqlValidator.validate(dto.jql());
+        jqlValidator.validate(dto.jql());
         var template = validateAndResolveTemplate(dto.mode(), dto.templateId(),
                 dto.scheduleCron(), dto.scheduleZone());
 

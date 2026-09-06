@@ -1,0 +1,11 @@
+{
+  "queries": [
+    {
+      "query": "project = !!!",
+      "errors": [
+        "Error in the JQL Query: '!' is a reserved JQL character.",
+        "The operator '=' is not supported by the 'project' field."
+      ]
+    }
+  ]
+}

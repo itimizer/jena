@@ -56,6 +56,14 @@ public abstract class AbstractJiraClient {
                           Class<T> type,
                           String description,
                           boolean propagateErrors) {
+        return fetch(request, type, description, propagateErrors, false);
+    }
+
+    private <T> T fetch(WebClient.RequestHeadersSpec<?> request,
+                        Class<T> type,
+                        String description,
+                        boolean propagateErrors,
+                        boolean propagateNotFound) {
         return request
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError,
@@ -63,8 +71,28 @@ public abstract class AbstractJiraClient {
                 .onStatus(HttpStatusCode::is5xxServerError,
                         response -> toError(response, description, false))
                 .bodyToMono(type)
-                .onErrorResume(e -> handleError(e, description, propagateErrors))
+                .onErrorResume(e ->
+                        handleError(e, description, propagateErrors, propagateNotFound))
                 .block();
+    }
+
+    /**
+     * Executes a request whose endpoint must exist: unlike {@link #fetch}, a {@code 404} is an
+     * error rather than an absent resource, and propagates as {@code HttpClientErrorException}.
+     * For calls where a missing endpoint means the client is pointed at the wrong Jira, not that
+     * the thing being asked about is gone.
+     *
+     * @param <T> the deserialized response body type
+     * @param request the request to execute
+     * @param type the class to deserialize the response body into
+     * @param description short phrase naming the call, used in log messages
+     * @return the deserialized response body
+     */
+    @SuppressWarnings("SameParameterValue")
+    protected <T> T fetchRequired(WebClient.RequestHeadersSpec<?> request,
+                                  Class<T> type,
+                                  String description) {
+        return fetch(request, type, description, true, true);
     }
 
     private Mono<? extends Throwable> toError(ClientResponse response, String description,
@@ -83,8 +111,10 @@ public abstract class AbstractJiraClient {
                 });
     }
 
-    private <T> Mono<T> handleError(Throwable e, String description, boolean propagateErrors) {
-        if (e instanceof HttpClientErrorException clientError
+    private <T> Mono<T> handleError(Throwable e, String description, boolean propagateErrors,
+                                    boolean propagateNotFound) {
+        if (!propagateNotFound
+                && e instanceof HttpClientErrorException clientError
                 && clientError.getStatusCode() == HttpStatus.NOT_FOUND) {
             log.warn("{} not found: {}", description, e.getMessage());
             return Mono.empty();

@@ -1,0 +1,6 @@
+{
+  "issues": [
+    {"id": "10000", "key": "TST-1", "self": "http://localhost/issue/10000"}
+  ],
+  "nextPageToken": "token-1"
+}
