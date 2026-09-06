@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.ZoneId;
+
 /**
  * {@link JiraUserService} that resolves the authenticated Jira account and caches it. Resolution
  * is attempted at startup, but a failure (e.g. Jira down at boot) is not fatal — the user is
@@ -54,12 +56,30 @@ public class JiraUserServiceImpl extends AbstractJiraClient implements JiraUserS
             jiraUser = fetchJiraUser();
 
             if (jiraUser == null) {
-                log.warn("Jira user could not be resolved; will retry on next use");
+                log.warn("Jira user could not be resolved; will retry on next use. Poll windows "
+                        + "fall back to the system time zone {} until it resolves, which may "
+                        + "offset them from Jira's", ZoneId.systemDefault().getId());
             } else {
-                log.info("Jira user: {}", jiraUser);
+                log.info("Jira user: {} (time zone {})",
+                        describe(jiraUser), jiraUser.getTimeZone());
             }
         }
         return jiraUser;
+    }
+
+    /**
+     * Human-readable identity for logs: the Server/DC username, else the email address, else the
+     * display name, else the Cloud {@code accountId}. Cloud returns neither {@code key} nor
+     * {@code name}, so logging the raw user would read like a failed authentication.
+     */
+    private static String describe(JiraUser user) {
+        if (user.getName() != null) {
+            return user.getName();
+        }
+        if (user.getEmailAddress() != null) {
+            return user.getEmailAddress();
+        }
+        return user.getDisplayName() != null ? user.getDisplayName() : user.getAccountId();
     }
 
     private boolean isConfigured() {

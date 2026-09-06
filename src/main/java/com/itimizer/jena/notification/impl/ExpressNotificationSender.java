@@ -47,6 +47,11 @@ public class ExpressNotificationSender extends AbstractNotificationSender {
     }
 
     @Override
+    protected boolean retryOnUnauthorized() {
+        return true;
+    }
+
+    @Override
     protected WebClient.RequestHeadersSpec<?> buildRequest(WebClient webClient,
                                                            NotificationMessageDto message) {
         Map<String, String> notificationBody = new HashMap<>();

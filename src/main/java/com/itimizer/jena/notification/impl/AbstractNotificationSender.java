@@ -14,6 +14,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * Base {@link NotificationSender} that owns the WebClient send pipeline — logging, 4xx/5xx and
@@ -61,6 +62,16 @@ public abstract class AbstractNotificationSender implements NotificationSender {
                                                                     NotificationMessageDto message);
 
     /**
+     * Whether a {@code 401} should be retried once with a freshly built request, for channels
+     * whose credentials are minted per request and can expire in flight.
+     *
+     * @return {@code true} to retry once on {@code 401}
+     */
+    protected boolean retryOnUnauthorized() {
+        return false;
+    }
+
+    /**
      * Formats the error message recorded when the channel API returns a non-2xx response.
      *
      * @param body the (possibly truncated) response body
@@ -82,7 +93,7 @@ public abstract class AbstractNotificationSender implements NotificationSender {
         log.debug("Starting {} notification for issue: {}", channel(), issueKey);
         log.trace("{} notification payload for {}: {}", channel(), issueKey, message.content());
 
-        var res = buildRequest(webClient, message)
+        var exchange = Mono.defer(() -> buildRequest(webClient, message)
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError, response -> {
                     log.warn("Client error occurred during sending {} notification for {}: "
@@ -106,7 +117,10 @@ public abstract class AbstractNotificationSender implements NotificationSender {
                                         response.statusCode(), apiErrorMessage(body)));
                             });
                 })
-                .toEntity(String.class)
+                .toEntity(String.class));
+
+        var res = (retryOnUnauthorized() ? exchange.retryWhen(unauthorizedRetry(issueKey))
+                : exchange)
                 .map(responseEntity -> {
                     if (responseEntity.getStatusCode().is2xxSuccessful()) {
                         log.debug("Successful {} notification for {}: Status {}",
@@ -143,5 +157,15 @@ public abstract class AbstractNotificationSender implements NotificationSender {
         log.trace("{} notification response for {}: {}", channel(), issueKey,
                 res != null ? res.getBody() : null);
         return res;
+    }
+
+    private Retry unauthorizedRetry(String issueKey) {
+        return Retry.max(1)
+                .filter(e -> e instanceof HttpClientErrorException clientError
+                        && clientError.getStatusCode().isSameCodeAs(HttpStatus.UNAUTHORIZED))
+                .doBeforeRetry(signal -> log.warn(
+                        "Retrying {} notification for {} with fresh credentials after 401",
+                        channel(), issueKey))
+                .onRetryExhaustedThrow((spec, signal) -> signal.failure());
     }
 }

@@ -5,6 +5,7 @@ jena:
     password:
   jira:
     url:
+    deployment-type: server
     pat:
     username:
     password:
@@ -34,6 +35,7 @@ jena:
       url:
       bot-id:
       secret-key:
+      token-ttl: 5m
   retryer:
     enabled:
     cron:
@@ -51,6 +53,7 @@ jena:
     wiretap: false
     response-timeout: 60s
     keep-alive: true
+    system-dns-resolver: true
     pool:
       max-connections: 50
       pending-acquire-timeout: 30s

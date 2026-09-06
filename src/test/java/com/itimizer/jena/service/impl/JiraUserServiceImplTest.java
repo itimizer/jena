@@ -88,11 +88,34 @@ class JiraUserServiceImplTest {
             assertThat(result.getDisplayName()).isEqualTo("Administrator");
             assertThat(result.isActive()).isTrue();
             assertThat(result.getTimeZone()).isEqualTo("Antarctica/Troll");
+            assertThat(result.getIdentifier()).isEqualTo("admin");
 
             RecordedRequest request = mockWebServer.takeRequest(1, TimeUnit.SECONDS);
             Assertions.assertNotNull(request);
             assertThat(request.getMethod()).isEqualTo("GET");
             assertThat(request.getPath()).isEqualTo("/rest/api/2/myself");
+        }
+
+        @Test
+        @DisplayName("should fetch a Jira Cloud user that carries no key or name")
+        void should_fetch_cloud_jira_user_without_key_and_name() throws IOException {
+            mockWebServer.enqueue(new MockResponse()
+                    .setResponseCode(200)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody(new String(new ClassPathResource("json/user/cloud-user.json")
+                            .getInputStream().readAllBytes())));
+
+            JiraUser result = jiraUserService.fetchJiraUser();
+            assertThat(result).isNotNull();
+            assertThat(result.getKey()).isNull();
+            assertThat(result.getName()).isNull();
+            assertThat(result.getAccountId())
+                    .isEqualTo("557058:923465e9-d83e-4798-9aa3-7f36f5602e57");
+            assertThat(result.getDisplayName()).isEqualTo("Administrator");
+            assertThat(result.isActive()).isTrue();
+            assertThat(result.getTimeZone()).isEqualTo("Antarctica/Troll");
+            assertThat(result.getIdentifier())
+                    .isEqualTo("557058:923465e9-d83e-4798-9aa3-7f36f5602e57");
         }
 
         @Test

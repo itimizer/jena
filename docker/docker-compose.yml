@@ -4,7 +4,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-#    image: itimizer/jena:1.0.0
+#    image: itimizer/jena:1.1.0
     container_name: jena-container
     ports:
       - "8080:8080"

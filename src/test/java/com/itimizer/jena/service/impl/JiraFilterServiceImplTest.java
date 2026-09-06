@@ -14,6 +14,7 @@ import com.itimizer.jena.repository.JiraFilterRepository;
 import com.itimizer.jena.repository.NotificationTargetRepository;
 import com.itimizer.jena.repository.RuleRepository;
 import com.itimizer.jena.repository.TemplateRepository;
+import com.itimizer.jena.service.JqlValidator;
 import com.itimizer.jena.transactionalmanager.TransactionAction;
 import com.itimizer.jena.transactionalmanager.TransactionRunner;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,7 +48,7 @@ class JiraFilterServiceImplTest {
     @Mock
     private JiraFilterMapper jiraFilterMapper;
     @Mock
-    private JiraJqlValidator jiraJqlValidator;
+    private JqlValidator jqlValidator;
     @Mock
     private TransactionRunner transactionRunner;
     @Mock
@@ -59,7 +60,7 @@ class JiraFilterServiceImplTest {
     void setUp() {
         service = new JiraFilterServiceImpl(
                 jiraFilterRepository, notificationTargetRepository, ruleRepository,
-                templateRepository, jiraFilterMapper, jiraJqlValidator, transactionRunner,
+                templateRepository, jiraFilterMapper, jqlValidator, transactionRunner,
                 eventPublisher);
     }
 

@@ -3,6 +3,7 @@ package com.itimizer.jena.config;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.resolver.DefaultAddressResolverGroup;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -115,6 +116,10 @@ public class WebClientConfig {
                 .responseTimeout(applicationProperties.getHttp().getResponseTimeout())
                 .option(ChannelOption.SO_KEEPALIVE,
                         applicationProperties.getHttp().isKeepAlive());
+
+        if (applicationProperties.getHttp().isSystemDnsResolver()) {
+            httpClient = httpClient.resolver(DefaultAddressResolverGroup.INSTANCE);
+        }
 
         var proxy = applicationProperties.getProxy();
         if (proxy != null && proxy.getEnabled()) {

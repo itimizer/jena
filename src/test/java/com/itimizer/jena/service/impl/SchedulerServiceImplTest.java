@@ -126,12 +126,7 @@ class SchedulerServiceImplTest {
                 .key("TST-1")
                 .build();
 
-        jiraSearchResult = new JiraSearchResult(
-                0,
-                1,
-                1,
-                new ArrayList<>(List.of(jiraIssueKey))
-        );
+        jiraSearchResult = new JiraSearchResult(List.of(jiraIssueKey));
 
         JiraIssueDeserializer deserializer = new JiraIssueDeserializer();
         ObjectMapper objectMapper = new ObjectMapper();
@@ -267,12 +262,7 @@ class SchedulerServiceImplTest {
         void should_skip_processing_when_no_issues_found() {
             when(jiraFilterService.findEnabled(FilterMode.INCREMENTAL)).thenReturn(List.of(filter));
             when(jiraSearchResultService.getLastUpdated(filter)).thenReturn(updated);
-            JiraSearchResult emptyResult = new JiraSearchResult(
-                0,
-                1,
-                1,
-                new ArrayList<>()
-            );
+            JiraSearchResult emptyResult = new JiraSearchResult(List.of());
             when(jiraSearchResultService.fetchAllJiraSearchResult(eq(filter),
                     any(LocalDateTime.class)))
                     .thenReturn(emptyResult);
@@ -470,7 +460,7 @@ class SchedulerServiceImplTest {
             when(jiraSearchResultService.getLastUpdated(healthy)).thenReturn(updated);
             when(jiraSearchResultService.fetchAllJiraSearchResult(eq(healthy),
                     any(LocalDateTime.class)))
-                    .thenReturn(new JiraSearchResult(0, 1, 1, new ArrayList<>()));
+                    .thenReturn(new JiraSearchResult(List.of()));
             when(jiraSearchResultService.saveJiraSearchResult(eq(healthy),
                     any(JiraSearchResult.class), any(ZonedDateTime.class)))
                     .thenReturn(new JiraSearchRun());
@@ -616,7 +606,7 @@ class SchedulerServiceImplTest {
             for (var key : keys) {
                 issueKeys.add(JiraIssueKey.builder().key(key).build());
             }
-            return new JiraSearchResult(0, keys.length, keys.length, issueKeys);
+            return new JiraSearchResult(issueKeys);
         }
 
         @Test

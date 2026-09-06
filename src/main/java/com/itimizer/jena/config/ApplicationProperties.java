@@ -61,6 +61,8 @@ public class ApplicationProperties {
 
         @NotBlank
         private String url;
+        @NotNull
+        private DeploymentType deploymentType = DeploymentType.SERVER;
         private String pat;
         private String username;
         private String password;
@@ -76,6 +78,11 @@ public class ApplicationProperties {
 
         @Setter(AccessLevel.NONE)
         private transient volatile Map<String, String> reversedNames;
+
+        public enum DeploymentType {
+            SERVER,
+            CLOUD
+        }
 
         @Data
         @NoArgsConstructor
@@ -143,6 +150,13 @@ public class ApplicationProperties {
             return names == null
                     || names.values().stream().distinct().count() == names.size();
         }
+
+        @AssertTrue(message = "Jira Cloud does not accept Personal Access Tokens: it authenticates "
+                + "only via basic auth. Set jena.jira.username to the Atlassian account email and "
+                + "jena.jira.password to an API token, and leave jena.jira.pat unset")
+        public boolean isAuthenticationSupportedByDeployment() {
+            return deploymentType != DeploymentType.CLOUD || pat == null;
+        }
     }
 
     @Data
@@ -183,6 +197,8 @@ public class ApplicationProperties {
             private String botId;
             private String secretKey;
             private List<String> chatId;
+            @NotNull
+            private Duration tokenTtl = Duration.ofMinutes(5);
         }
     }
 
@@ -234,6 +250,7 @@ public class ApplicationProperties {
         @NotNull
         private Duration responseTimeout = Duration.ofSeconds(60);
         private boolean keepAlive = true;
+        private boolean systemDnsResolver = true;
         @Valid
         private Pool pool = new Pool();
 

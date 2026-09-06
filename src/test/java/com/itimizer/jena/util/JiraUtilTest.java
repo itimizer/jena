@@ -7,6 +7,7 @@ import com.itimizer.jena.config.ApplicationProperties;
 import com.itimizer.jena.domain.JiraIssue;
 import com.itimizer.jena.domain.JiraIssueChangelogGroup;
 import com.itimizer.jena.domain.JiraIssueChangelogItem;
+import com.itimizer.jena.domain.JiraUser;
 import com.itimizer.jena.domain.TemplateField;
 import com.itimizer.jena.mapper.JiraIssueDeserializer;
 import com.itimizer.jena.mapper.field.FieldMapper;
@@ -45,6 +46,8 @@ class JiraUtilTest {
 
     @InjectMocks
     private JiraUtil jiraUtil;
+
+    private static final String CLOUD_ACCOUNT_ID = "557058:923465e9-d83e-4798-9aa3-7f36f5602e57";
 
     private JiraIssue issue;
 
@@ -175,6 +178,25 @@ class JiraUtilTest {
             assertThat(reporterField).isNotNull();
             assertThat(reporterField.getValue()).isNull();
             assertThat(reporterField.getStringValue()).isNull();
+        }
+
+        @Test
+        @DisplayName("should fall back to the accountId for Cloud users that carry no key or name")
+        void should_use_account_id_when_creator_reporter_assignee_have_no_key() {
+            ApplicationProperties.Jira jiraConfig = new ApplicationProperties.Jira();
+            jiraConfig.setNames(Map.of("fixVersions", "Fix Version",
+                    "versions", "Version",
+                    "components", "Component"));
+            when(applicationProperties.getJira()).thenReturn(jiraConfig);
+
+            Map<String, Object> result =
+                    jiraUtil.getJiraIssueFieldsCtx(issueWithCloudPeople(), true);
+
+            for (String field : List.of("creator", "reporter", "assignee")) {
+                TemplateField templateField = (TemplateField) result.get(field);
+                assertThat(templateField.getValue()).isEqualTo(CLOUD_ACCOUNT_ID);
+                assertThat(templateField.getStringValue()).isEqualTo("Administrator");
+            }
         }
 
         @Test
@@ -585,6 +607,43 @@ class JiraUtilTest {
             assertThatThrownBy(() -> jiraUtil.convertFieldNameToKey(item, null))
                     .isInstanceOf(NullPointerException.class);
         }
+    }
+
+    private JiraIssue issueWithCloudPeople() {
+        JiraUser cloudUser = JiraUser.builder()
+                .accountId(CLOUD_ACCOUNT_ID)
+                .displayName("Administrator")
+                .active(true)
+                .timeZone("Antarctica/Troll")
+                .build();
+        return new JiraIssue(
+                issue.getId(),
+                issue.getSelf(),
+                issue.getKey(),
+                issue.getStatus(),
+                issue.getIssueType(),
+                issue.getProject(),
+                issue.getComponents(),
+                issue.getSummary(),
+                issue.getDescription(),
+                cloudUser,
+                cloudUser,
+                cloudUser,
+                issue.getResolution(),
+                issue.getCreated(),
+                issue.getUpdated(),
+                issue.getResolutiondate(),
+                issue.getDuedate(),
+                issue.getPriority(),
+                issue.getFixVersions(),
+                issue.getVersions(),
+                issue.getTimeoriginalestimate(),
+                issue.getTimeestimate(),
+                issue.getTimespent(),
+                issue.getLabels(),
+                issue.getIssueFields(),
+                issue.getChangelog(),
+                issue.getNames());
     }
 
     private JiraIssue issueWithNullCreatorAndReporter() {
